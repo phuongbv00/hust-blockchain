@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react'
-import { ethers } from 'ethers'
+import { useState, useEffect } from "react"
+import { ethers } from "ethers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { TokenType } from '../constants/tokenTypes'
+import type { TokenType } from "../constants/tokenTypes"
 
 interface DebtsListProps {
   signer: ethers.Signer | null
   lendingContract: ethers.Contract | null
+}
+
+interface DebtToken {
+  type: TokenType
+  amount: string
 }
 
 interface Debt {
@@ -15,8 +20,7 @@ interface Debt {
   borrower: string
   collateralType: TokenType
   collateralAmount: string
-  debtType: TokenType
-  debtAmount: string
+  debtTokens: DebtToken[]
 }
 
 export default function DebtsList({ signer, lendingContract }: DebtsListProps) {
@@ -35,7 +39,7 @@ export default function DebtsList({ signer, lendingContract }: DebtsListProps) {
       const debtsData = await lendingContract.getAllDebts()
       setDebts(debtsData)
     } catch (error) {
-      console.error('Failed to fetch debts:', error)
+      console.error("Failed to fetch debts:", error)
     } finally {
       setIsLoading(false)
     }
@@ -47,11 +51,11 @@ export default function DebtsList({ signer, lendingContract }: DebtsListProps) {
     try {
       const tx = await lendingContract.liquidate(debtId)
       await tx.wait()
-      alert('Liquidation successful!')
+      alert("Liquidation successful!")
       fetchDebts()
     } catch (error) {
-      console.error('Liquidation failed:', error)
-      alert('Liquidation failed. See console for details.')
+      console.error("Liquidation failed:", error)
+      alert("Liquidation failed. See console for details.")
     }
   }
 
@@ -70,10 +74,8 @@ export default function DebtsList({ signer, lendingContract }: DebtsListProps) {
               <TableRow>
                 <TableHead>Debt ID</TableHead>
                 <TableHead>Borrower</TableHead>
-                <TableHead>Collateral Type</TableHead>
-                <TableHead>Collateral Amount</TableHead>
-                <TableHead>Debt Type</TableHead>
-                <TableHead>Debt Amount</TableHead>
+                <TableHead>Collateral</TableHead>
+                <TableHead>Debt Tokens</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -82,10 +84,16 @@ export default function DebtsList({ signer, lendingContract }: DebtsListProps) {
                 <TableRow key={debt.id}>
                   <TableCell>{debt.id}</TableCell>
                   <TableCell>{debt.borrower}</TableCell>
-                  <TableCell>{debt.collateralType}</TableCell>
-                  <TableCell>{ethers.formatEther(debt.collateralAmount)} {debt.collateralType}</TableCell>
-                  <TableCell>{debt.debtType}</TableCell>
-                  <TableCell>{ethers.formatEther(debt.debtAmount)} {debt.debtType}</TableCell>
+                  <TableCell>
+                    {ethers.formatEther(debt.collateralAmount)} {debt.collateralType}
+                  </TableCell>
+                  <TableCell>
+                    {debt.debtTokens.map((token, index) => (
+                      <div key={index}>
+                        {ethers.formatEther(token.amount)} {token.type}
+                      </div>
+                    ))}
+                  </TableCell>
                   <TableCell>
                     <Button onClick={() => handleLiquidate(debt.id)}>Liquidate</Button>
                   </TableCell>

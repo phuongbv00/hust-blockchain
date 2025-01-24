@@ -9,12 +9,10 @@ import AssetsSeed from './components/AssetsSeed'
 import PriceOracle from './components/PriceOracle'
 import { TOKEN_TYPES } from './constants/tokenTypes'
 import Image from 'next/image'
+import { LENDING_CONTRACT_ABI } from './constants/lendingContractABI'
 
 // Replace these with your actual contract address and ABI
 const LENDING_CONTRACT_ADDRESS = '0x...';
-const LENDING_ABI = [
-  // Your contract ABI here
-];
 
 declare global {
   interface Window {
@@ -46,7 +44,7 @@ export default function LendingSystem() {
         const signer = await provider.getSigner()
         const address = await signer.getAddress()
         
-        const lendingContract = new ethers.Contract(LENDING_CONTRACT_ADDRESS, LENDING_ABI, signer)
+        const lendingContract = new ethers.Contract(LENDING_CONTRACT_ADDRESS, LENDING_CONTRACT_ABI, signer)
         
         setIsConnected(true)
         setSigner(signer)
