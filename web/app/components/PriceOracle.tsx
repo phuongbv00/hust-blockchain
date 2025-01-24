@@ -33,15 +33,14 @@ export default function PriceOracle({ signer, lendingContract, tokenTypes }: Pri
     if (!lendingContract) return
 
     try {
-      const prices = await Promise.all(
-        tokenTypes
-          .filter((token) => token.id !== "ETH")
-          .map(async (token) => {
-            const price = await lendingContract.getTokenPrice(token.id)
-            return { tokenType: token.id, price: ethers.formatEther(price) }
-          }),
-      )
-      setTokenPrices(prices)
+      const prices = await lendingContract.getTokenPrices()
+      const formattedPrices = prices
+        .filter((price: { tokenType: string; price: ethers.BigNumberish }) => price.tokenType !== "ETH")
+        .map((price: { tokenType: string; price: ethers.BigNumberish }) => ({
+          tokenType: price.tokenType as TokenType,
+          price: ethers.formatEther(price.price),
+        }))
+      setTokenPrices(formattedPrices)
     } catch (error) {
       console.error("Failed to fetch token prices:", error)
     }
