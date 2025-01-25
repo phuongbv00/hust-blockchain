@@ -3,16 +3,24 @@ pragma solidity ^0.8.0;
 
 interface IPriceOracle {
     function getPrice(address asset) external view returns (uint256);
+
     function setPrice(address asset, uint256 price) external;
 }
 
 interface IERC20 {
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
+
+    function transfer(
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 }
 
 contract LendingProtocol {
-
     // Cấu trúc cho một khoản vay
     struct Debt {
         address debtAsset;
@@ -28,7 +36,7 @@ contract LendingProtocol {
     }
 
     mapping(address => uint256) availableAssets;
-    
+
     // Mapping to store user positions
     mapping(address => Loan) public loans;
 
@@ -36,7 +44,7 @@ contract LendingProtocol {
     mapping(address => uint256) public collateralFactors;
 
     // Mapping to store asset prices (local storage of prices)
-    mapping(address => uint256) public assetPrices;
+    mapping(address => uint256) public exchangeRates;
 
     IPriceOracle public priceOracle;
     uint256 public constant LIQUIDATION_THRESHOLD = 100; // 100% ngưỡng thanh lý
@@ -46,12 +54,22 @@ contract LendingProtocol {
     // }
 
     // Event
-    event LoanInitialized(address indexed user, address collateralAsset, uint256 collateralAmount);
+    event LoanInitialized(
+        address indexed user,
+        address collateralAsset,
+        uint256 collateralAmount
+    );
     event CollateralFactorUpdated(address asset, uint256 factor);
-    event PriceUpdated(address asset, uint256 price);
+    event ExchangeRateUpdated(address asset, uint256 price);
     event CollateralDeposited(address user, address asset, uint256 amount);
     event AssetBorrowed(address user, address asset, uint256 amount);
-    event Liquidation(address indexed user, address liquidateToken, uint256 liquidationAmount, uint256 usdcLost);
+    event Liquidation(
+        address indexed borrower,
+        address repayToken,
+        uint256 repayAmount,
+        address seizedToken,
+        uint256 seizedAmount
+    );
 
     // Hàm thêm tài sản vào danh sách khả dụng (chỉ chủ sở hữu hợp đồng được phép gọi)
     function seedAssets(address tokenType, uint256 amount) external {
@@ -65,16 +83,16 @@ contract LendingProtocol {
         emit CollateralFactorUpdated(asset, factor);
     }
 
-    /* 
-        @params: 
-        collateralAsset,
-        collateralAmount,
-        Map(address debtAsset, uint256 debtAmount)
-
-    */
-    function borrow(address collateralAsset, uint256 collateralAmount, Debt[] calldata debts) external {    
+    function borrow(
+        address collateralAsset,
+        uint256 collateralAmount,
+        Debt[] calldata debts
+    ) external {
         require(collateralAmount > 0, "Invalid collateral amount");
-        require(collateralFactors[collateralAsset] > 0, "Invalid collateral factor");
+        require(
+            collateralFactors[collateralAsset] > 0,
+            "Invalid collateral factor"
+        );
 
         Loan storage loan = loans[msg.sender];
 
@@ -84,9 +102,10 @@ contract LendingProtocol {
             "Existing loan position must be closed first"
         );
 
-        // Tính giá trị thế chấp
-        uint256 collateralValue = collateralAmount * assetPrices[collateralAsset];
-        uint256 maxBorrowValue = (collateralValue * collateralFactors[collateralAsset] / 100);
+        // Tính khả năng vay
+        uint256 borrowCapacity = (collateralAmount *
+            collateralFactors[collateralAsset]) /
+            exchangeRates[collateralAsset];
 
         // Tính giá trị khoản vay được yêu cầu
         uint256 totalBorrowValue = 0;
@@ -94,14 +113,14 @@ contract LendingProtocol {
             Debt memory request = debts[i];
             require(request.debtAmount > 0, "Invalid borrow amount");
 
-            uint256 assetPrice = assetPrices[request.debtAsset];
-            require(assetPrice > 0, "Asset price not set");
+            uint256 exchangeRate = exchangeRates[request.debtAsset];
+            require(exchangeRate > 0, "Asset exchange rate was not set");
 
-            totalBorrowValue += request.debtAmount * assetPrice;
+            totalBorrowValue += request.debtAmount / exchangeRate;
         }
 
         // Kiểm tra tính hợp lệ của khoản vay
-        require(totalBorrowValue <= maxBorrowValue, "Exceeds borrowing limit");
+        require(totalBorrowValue <= borrowCapacity, "Exceeds borrowing limit");
 
         // Cập nhật thông tin khoản vay
         loan.collateralAsset = collateralAsset;
@@ -114,115 +133,111 @@ contract LendingProtocol {
         }
 
         emit LoanInitialized(msg.sender, collateralAsset, collateralAmount);
-
     }
 
-
-    // Get the collateral value
-    function getCollateralValue(address user) public view returns (uint256) {
+    function getBorrowCapacity(address user) public view returns (uint256) {
         Loan storage loan = loans[user];
-        uint256 price = assetPrices[loan.collateralAsset];
-        return loan.collateralAmount * price;
+        return
+            (loan.collateralAmount * collateralFactors[loan.collateralAsset]) /
+            exchangeRates[loan.collateralAsset];
     }
 
-    // Get the debt value
     function getDebtValue(address user) public view returns (uint256) {
         Loan storage loan = loans[user];
         uint256 totalDebt = 0;
-
         for (uint256 i = 0; i < loan.borrowedAssetList.length; i++) {
             address asset = loan.borrowedAssetList[i];
-            totalDebt += loan.borrowedAssets[asset] * assetPrices[asset];
+            totalDebt += loan.borrowedAssets[asset] / exchangeRates[asset];
         }
-
         return totalDebt;
     }
 
-    // Check liquidation status
-    function checkHealth(address user) public view returns (bool) {
-        Loan storage loan = loans[user];
-        
-        // Kiểm tra người dùng có vị thế vay không
-        if (loan.collateralAsset == address(0) || loan.collateralAmount == 0) {
-            return false; // Không có vị thế vay
-        }
-
-        // Giá trị tài sản thế chấp
-        uint256 collateralPrice = assetPrices[loan.collateralAsset];
-        uint256 collateralValue = loan.collateralAmount * collateralPrice;
-
-        // Giá trị tối thiểu cần thiết để giữ khoản vay lành mạnh
-        uint256 requiredCollateralValue = (getDebtValue(user)) / collateralFactors[loan.collateralAsset] * 100;
-
-        // Kiểm tra xem có thể thanh lý không
-        return collateralValue < requiredCollateralValue;
-    }
-
-    /*
-        Liquidate the user's position    
-    */
-    function liquidate(address user, address liquidateToken, uint256 usdcPerEthRate) public returns (uint256) {
+    function liquidate(
+        address borrower,
+        address repayToken,
+        uint256 liquidatorExchangeRate
+    ) public returns (uint256) {
         // Lấy thông tin vị thế vay của Bob
-        Loan storage loan = loans[user];
+        Loan storage loan = loans[borrower];
 
         // Kiểm tra người dùng có vị thế vay không
         require(loan.collateralAsset != address(0), "No active loan for user");
-        require(loan.borrowedAssets[liquidateToken] > 0, "No debt to liquidate for this asset");
+        require(
+            loan.borrowedAssets[repayToken] > 0,
+            "No debt to liquidate for this asset"
+        );
 
-        // Tính giá trị tài sản thế chấp (USDC)
-        uint256 collateralValue = loan.collateralAmount * assetPrices[loan.collateralAsset];
+        // Kiểm tra sức khoẻ vị thế vay
+        uint256 borrowCapacity = getBorrowCapacity(borrower);
+        uint256 debtValue = getDebtValue(borrower);
+        if (borrowCapacity >= debtValue) {
+            return 0;
+        }
 
-        // Tính tổng giá trị nợ (ETH và AXS)
-        uint256 totalDebt = getDebtValue(user);
+        // Liquidate
+        //
+        // x: seizedAmount - The collateral seized is transferred to the liquidator (liquidator receives)
+        // y: repayAmount - The amount of the underlying borrowed asset to repay (liquidator repays)
+        //
+        // Calculate to satisfy:
+        //
+        // newBorrowCapacity = (collateralAmount - x) * collateralFactorX / exchangeRateX
+        // newDebtValue = debtValue - y / exchangeRateY
+        // newBorrowCapacity >= newDebtValue
+        // x / y == liquidatorExchangeRate
+        uint256 collateralAmount = loan.collateralAmount;
+        uint256 collateralFactorX = collateralFactors[loan.collateralAsset];
+        uint256 exchangeRateX = exchangeRates[loan.collateralAsset];
+        uint256 exchangeRateY = exchangeRates[repayToken];
+        uint256 repayAmount = ((collateralAmount * collateralFactorX) /
+            exchangeRateX -
+            debtValue) /
+            ((liquidatorExchangeRate * collateralFactorX) /
+                exchangeRateX +
+                1 /
+                exchangeRateY);
 
-        // Tính tỷ lệ nợ cần đạt được để vị thế an toàn
-        uint256 requiredCollateralValue = totalDebt / collateralFactors[loan.collateralAsset] * 100;
+        require(
+            repayAmount <= loan.borrowedAssets[repayToken],
+            "LIQUIDATE_REPAY_MORE_THAN_BORROW"
+        );
 
-        // // Nếu tài sản thế chấp đã đủ, không cần thanh lý
-        // if (collateralValue >= requiredCollateralValue) {
-        //     revert("No liquidation needed. Collateral is sufficient.");
-        // }
+        uint256 seizedAmount = liquidatorExchangeRate * repayAmount;
 
-        // Tính toán số lượng ETH cần thanh lý để đảm bảo vị thế an toàn
-        uint256 excessDebt = requiredCollateralValue - collateralValue;
-        uint256 liquidationAmountETH = excessDebt / (assetPrices[liquidateToken] - usdcPerEthRate * collateralFactors[liquidateToken] * 100);
+        // Kiểm tra xem Bob có đủ tài sản thế chấp để thanh lý không
+        require(
+            seizedAmount <= loan.collateralAmount,
+            "LIQUIDATE_SEIZE_MORE_THAN_COLLATERAL"
+        );
 
-        // Kiểm tra số lượng ETH cần thanh lý không vượt quá số nợ hiện tại
-        uint256 currentEthDebt = loan.borrowedAssets[liquidateToken];
-        require(liquidationAmountETH <= currentEthDebt, "Cannot liquidate more than the debt");
+        // Khấu trừ tài sản thế chấp của Bob
+        loan.collateralAmount -= seizedAmount;
 
-        // Thanh lý ETH (giảm số nợ ETH)
-        loan.borrowedAssets[liquidateToken] -= liquidationAmountETH;
+        // Tịch thu 1 phần khoản vay của Bob
+        loan.borrowedAssets[repayToken] -= repayAmount;
 
-        // Tính toán số lượng USDC sẽ bị mất từ tài sản thế chấp
-        uint256 requiredUSDC = liquidationAmountETH * usdcPerEthRate;
+        // TODO: Chuyển phần tài sản tịch thu cho liquidator
 
-        // Kiểm tra xem Bob có đủ USDC để thanh lý không
-        require(requiredUSDC <= loan.collateralAmount, "Not enough collateral to liquidate");
+        // TODO: Khấu trừ khoản repay của liquidator
 
-        // Trừ USDC từ tài sản thế chấp của Bob
-        loan.collateralAmount -= requiredUSDC;
+        address seizedToken = loan.collateralAsset;
 
-        // Chuyển USDC cho liquidator (người gọi hàm)
-        // usdcToken.transfer(msg.sender, requiredUSDC);
-
-        // Emit sự kiện thanh lý
-        emit Liquidation(user, liquidateToken, liquidationAmountETH, requiredUSDC);
-        return requiredUSDC;
+        emit Liquidation(
+            borrower,
+            repayToken,
+            repayAmount,
+            seizedToken,
+            seizedAmount
+        );
+        return seizedAmount;
     }
 
-    // Update price manual
-    function setTokenPrice(address tokenType, uint256 newPrice) external {
-        // priceOracle.setPrice(asset, newPrice);
-        assetPrices[tokenType] = newPrice;
-        emit PriceUpdated(tokenType, newPrice);
+    function setExchangeRate(address tokenType, uint256 rate) external {
+        exchangeRates[tokenType] = rate;
+        emit ExchangeRateUpdated(tokenType, rate);
     }
 
-    // Fetch the current price from the Price Oracle (in case you want to update from the Oracle)
-    function updatePriceFromOracle(address asset) external {
-        uint256 price = priceOracle.getPrice(asset);
-        assetPrices[asset] = price;
-        emit PriceUpdated(asset, price);
+    function getExchangeRate(address tokenType) public view returns (uint256) {
+        return exchangeRates[tokenType];
     }
 }
-
