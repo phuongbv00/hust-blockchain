@@ -174,10 +174,9 @@ contract LendingProtocol {
         uint256 borrowCapacity = getBorrowCapacity(borrower);
         uint256 debtValue = getDebtValue(borrower);
         uint256 healthFactor = borrowCapacity / debtValue;
-        // if (borrowCapacity >= debtValue) {
-        //     emit Liquidation(borrower, repayToken, 0, seizedToken, 0);
-        //     return 0;
-        // }
+        if (borrowCapacity >= debtValue) {
+            return 0;
+        }
 
         // Liquidate
         //
