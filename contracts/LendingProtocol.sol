@@ -70,6 +70,7 @@ contract LendingProtocol {
         address seizedToken,
         uint256 seizedAmount
     );
+    error LiquidationError(uint256 n);
 
     // Hàm thêm tài sản vào danh sách khả dụng (chỉ chủ sở hữu hợp đồng được phép gọi)
     function seedAssets(address tokenType, uint256 amount) external {
@@ -116,7 +117,7 @@ contract LendingProtocol {
             uint256 exchangeRate = exchangeRates[request.debtAsset];
             require(exchangeRate > 0, "Asset exchange rate was not set");
 
-            totalBorrowValue += request.debtAmount / exchangeRate;
+            totalBorrowValue += (request.debtAmount * 1e18) / exchangeRate;
         }
 
         // Kiểm tra tính hợp lệ của khoản vay
@@ -147,7 +148,9 @@ contract LendingProtocol {
         uint256 totalDebt = 0;
         for (uint256 i = 0; i < loan.borrowedAssetList.length; i++) {
             address asset = loan.borrowedAssetList[i];
-            totalDebt += loan.borrowedAssets[asset] / exchangeRates[asset];
+            totalDebt +=
+                (loan.borrowedAssets[asset] * 1e18) /
+                exchangeRates[asset];
         }
         return totalDebt;
     }
@@ -167,15 +170,14 @@ contract LendingProtocol {
             "No debt to liquidate for this asset"
         );
 
-        address seizedToken = loan.collateralAsset;
-
         // Kiểm tra sức khoẻ vị thế vay
         uint256 borrowCapacity = getBorrowCapacity(borrower);
         uint256 debtValue = getDebtValue(borrower);
-        if (borrowCapacity >= debtValue) {
-            emit Liquidation(borrower, repayToken, 0, seizedToken, 0);
-            return 0;
-        }
+        uint256 healthFactor = borrowCapacity / debtValue;
+        // if (borrowCapacity >= debtValue) {
+        //     emit Liquidation(borrower, repayToken, 0, seizedToken, 0);
+        //     return 0;
+        // }
 
         // Liquidate
         //
@@ -188,24 +190,45 @@ contract LendingProtocol {
         // newDebtValue = debtValue - y / exchangeRateY
         // newBorrowCapacity >= newDebtValue
         // x / y == liquidatorExchangeRate
-        uint256 collateralAmount = loan.collateralAmount;
         uint256 collateralFactorX = collateralFactors[loan.collateralAsset];
         uint256 exchangeRateX = exchangeRates[loan.collateralAsset];
         uint256 exchangeRateY = exchangeRates[repayToken];
-        uint256 repayAmount = ((collateralAmount * collateralFactorX) /
-            exchangeRateX -
-            debtValue) /
-            ((liquidatorExchangeRate * collateralFactorX) /
-                exchangeRateX +
-                1 /
-                exchangeRateY);
+        // uint256 repayAmount = ((collateralAmount * collateralFactorX) /
+        //     exchangeRateX -
+        //     debtValue) /
+        //     ((liquidatorExchangeRate * collateralFactorX) /
+        //         exchangeRateX +
+        //         1 /
+        //         exchangeRateY);
+        uint256 repayAmount = 0;
+        uint256 seizedAmount = 0;
+        uint256 df = 0;
+        while (healthFactor < 1) {
+            df++;
+            // repayAmount++;
+            // seizedAmount = liquidatorExchangeRate * repayAmount;
+            seizedAmount += 1e18 * df;
+            repayAmount = (seizedAmount * 1e18) / liquidatorExchangeRate;
+            // seizedAmount++;
+            // borrowCapacity -=
+            //     (seizedAmount * collateralFactorX) /
+            //     exchangeRateX;
+            // debtValue -= (repayAmount * 1e18) / exchangeRateY;
+            // healthFactor = (borrowCapacity - (seizedAmount * collateralFactorX) /
+            //     exchangeRateX)/(debtValue - (repayAmount * 1e18) / exchangeRateY);
+            healthFactor =
+                ((borrowCapacity *
+                    exchangeRateX -
+                    seizedAmount *
+                    collateralFactorX) * exchangeRateY) /
+                exchangeRateX /
+                (debtValue * exchangeRateY - repayAmount * 1e18);
+        }
 
         require(
             repayAmount <= loan.borrowedAssets[repayToken],
             "LIQUIDATE_REPAY_MORE_THAN_BORROW"
         );
-
-        uint256 seizedAmount = liquidatorExchangeRate * repayAmount;
 
         // Kiểm tra xem Bob có đủ tài sản thế chấp để thanh lý không
         require(
@@ -227,7 +250,7 @@ contract LendingProtocol {
             borrower,
             repayToken,
             repayAmount,
-            seizedToken,
+            loan.collateralAsset,
             seizedAmount
         );
         return seizedAmount;
