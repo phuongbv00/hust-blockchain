@@ -139,7 +139,6 @@ describe("LendingProtocol", function () {
     const finalLoan = await lendingProtocol.getLoan(bob.address);
 
     // Assert collateral is reduced
-    expect(finalLoan.collateralAmount).to.be.lt(initialLoan.collateralAmount);
     const remainBorrowedETH = finalLoan.borrowedAmounts[0];
     console.log(
       "remainCollaterals",
@@ -149,6 +148,7 @@ describe("LendingProtocol", function () {
       "remainBorrowedETH",
       ethers.formatUnits(remainBorrowedETH, DECIMALS)
     );
+    expect(finalLoan.collateralAmount).to.be.lt(initialLoan.collateralAmount);
     expect(remainBorrowedETH).to.be.lt(borrwedETH);
   });
 });
