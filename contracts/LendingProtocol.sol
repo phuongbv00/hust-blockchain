@@ -167,10 +167,13 @@ contract LendingProtocol {
             "No debt to liquidate for this asset"
         );
 
+        address seizedToken = loan.collateralAsset;
+
         // Kiểm tra sức khoẻ vị thế vay
         uint256 borrowCapacity = getBorrowCapacity(borrower);
         uint256 debtValue = getDebtValue(borrower);
         if (borrowCapacity >= debtValue) {
+            emit Liquidation(borrower, repayToken, 0, seizedToken, 0);
             return 0;
         }
 
@@ -220,8 +223,6 @@ contract LendingProtocol {
 
         // TODO: Khấu trừ khoản repay của liquidator
 
-        address seizedToken = loan.collateralAsset;
-
         emit Liquidation(
             borrower,
             repayToken,
@@ -239,5 +240,35 @@ contract LendingProtocol {
 
     function getExchangeRate(address tokenType) public view returns (uint256) {
         return exchangeRates[tokenType];
+    }
+
+    function getLoan(
+        address borrower
+    )
+        public
+        view
+        returns (
+            address collateralAsset,
+            uint256 collateralAmount,
+            address[] memory borrowedAssetList,
+            uint256[] memory borrowedAmounts
+        )
+    {
+        Loan storage loan = loans[borrower];
+
+        // Initialize arrays to store borrowed assets and amounts
+        uint256[] memory amounts = new uint256[](loan.borrowedAssetList.length);
+
+        // Loop through the borrowedAssetList and retrieve amounts from the borrowedAssets mapping
+        for (uint i = 0; i < loan.borrowedAssetList.length; i++) {
+            amounts[i] = loan.borrowedAssets[loan.borrowedAssetList[i]];
+        }
+
+        return (
+            loan.collateralAsset,
+            loan.collateralAmount,
+            loan.borrowedAssetList,
+            amounts
+        );
     }
 }
