@@ -155,6 +155,10 @@ contract LendingProtocol {
         return totalDebt;
     }
 
+    function getHealthFactor(address user) public view returns (uint256) {
+        return getBorrowCapacity(user) * 1e18 / getDebtValue(user);
+    }
+
     function liquidate(
         address borrower,
         address repayToken,

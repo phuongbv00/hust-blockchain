@@ -124,22 +124,29 @@ describe("LendingProtocol", function () {
     // Log Bob's initial loan state before liquidation
     const initialLoan = await lendingProtocol.getLoan(bob.address);
     const borrwedETH = initialLoan.borrowedAmounts[0];
+    const currentHealthfactor = await lendingProtocol.getHealthFactor(
+      bob.address
+    );
     console.log(
       "initialCollaterals",
       ethers.formatUnits(initialLoan.collateralAmount, DECIMALS)
     );
     console.log("initialBorrowedETH", ethers.formatUnits(borrwedETH, DECIMALS));
+    console.log(
+      "currentHealthfactor",
+      ethers.formatUnits(currentHealthfactor, DECIMALS)
+    );
 
     // Alice liquidates Bob's loan
+    console.log("liquidating...");
     await lendingProtocol
       .connect(alice)
       .liquidate(bob.address, eth.target, liquidatorExchangeRate);
 
     // Log Bob's loan state after liquidation
     const finalLoan = await lendingProtocol.getLoan(bob.address);
-
-    // Assert collateral is reduced
     const remainBorrowedETH = finalLoan.borrowedAmounts[0];
+    const newHealthfactor = await lendingProtocol.getHealthFactor(bob.address);
     console.log(
       "remainCollaterals",
       ethers.formatUnits(finalLoan.collateralAmount, DECIMALS)
@@ -148,6 +155,11 @@ describe("LendingProtocol", function () {
       "remainBorrowedETH",
       ethers.formatUnits(remainBorrowedETH, DECIMALS)
     );
+    console.log(
+      "newHealthfactor",
+      ethers.formatUnits(newHealthfactor, DECIMALS)
+    );
+    expect(newHealthfactor).to.be.gte(1);
     expect(finalLoan.collateralAmount).to.be.lt(initialLoan.collateralAmount);
     expect(remainBorrowedETH).to.be.lt(borrwedETH);
   });
