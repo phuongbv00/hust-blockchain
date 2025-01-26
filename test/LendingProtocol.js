@@ -88,21 +88,19 @@ describe("LendingProtocol", function () {
 
     await lendingProtocol
       .connect(bob)
-      .borrow(usdc.target, ethers.parseUnits("1000", DECIMALS), [
-        {
-          debtAsset: eth.target,
-          debtAmount: ethers.parseUnits("0.2", DECIMALS),
-        },
-        {
-          debtAsset: axs.target,
-          debtAmount: ethers.parseUnits("20", DECIMALS),
-        },
-      ]);
+      .borrow(
+        usdc.target,
+        ethers.parseUnits("1000", DECIMALS),
+        [eth.target, axs.target],
+        [ethers.parseUnits("0.2", DECIMALS), ethers.parseUnits("20", DECIMALS)]
+      );
 
     const loan = await lendingProtocol.getLoan(bob.address);
 
-    expect(loan.collateralAsset).to.equal(usdc.target);
+    expect(loan.collateralToken).to.equal(usdc.target);
     expect(loan.collateralAmount).to.equal(ethers.parseUnits("1000", DECIMALS));
+    expect(loan.borrowedTokens[0]).to.equal(eth.target);
+    expect(loan.borrowedTokens[1]).to.equal(axs.target);
     expect(loan.borrowedAmounts[0]).to.equal(
       ethers.parseUnits("0.2", DECIMALS)
     );
