@@ -105,6 +105,10 @@ describe("LendingProtocol", function () {
       ethers.parseUnits("0.2", DECIMALS)
     );
     expect(loan.borrowedAmounts[1]).to.equal(ethers.parseUnits("20", DECIMALS));
+
+    const healthFactor = await lendingProtocol.getHealthFactor(bob.address);
+    console.log("healthFactor:", ethers.formatUnits(healthFactor, DECIMALS));
+    expect(healthFactor).to.gte(ethers.parseUnits("1", DECIMALS));
   });
 
   it("should allow liquidating unhealthy positions", async function () {
