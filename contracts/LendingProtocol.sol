@@ -28,23 +28,23 @@ contract LendingProtocol {
         mapping(address => uint256) borrowedAmounts;
     }
 
-    mapping(address => Loan) private loans;
+    mapping(address => Loan) private _loans;
 
     mapping(address => uint256) public collateralFactors;
 
     mapping(address => uint256) public exchangeRates;
 
     // Event
-    event LoanInitialized(
-        address indexed user,
+    event Borrow(
+        address indexed borrower,
         address collateralAsset,
-        uint256 collateralAmount
+        uint256 collateralAmount,
+        address[] borrowedTokens,
+        uint256[] borrowedAmounts
     );
-    event CollateralFactorUpdated(address asset, uint256 factor);
-    event ExchangeRateUpdated(address asset, uint256 price);
-    event CollateralDeposited(address user, address asset, uint256 amount);
-    event AssetBorrowed(address user, address asset, uint256 amount);
-    event Liquidation(
+    event UpdateCollateralFactor(address token, uint256 factor);
+    event UpdateExchangeRate(address token, uint256 rate);
+    event Liquidate(
         address indexed borrower,
         address repayToken,
         uint256 repayAmount,
@@ -55,7 +55,7 @@ contract LendingProtocol {
     function setCollateralFactor(address token, uint256 factor) external {
         require(factor > 0 && factor <= 1e18, "Invalid factor");
         collateralFactors[token] = factor;
-        emit CollateralFactorUpdated(token, factor);
+        emit UpdateCollateralFactor(token, factor);
     }
 
     function borrow(
@@ -70,7 +70,7 @@ contract LendingProtocol {
             "Invalid collateral factor"
         );
 
-        Loan storage loan = loans[msg.sender];
+        Loan storage loan = _loans[msg.sender];
 
         // Kiểm tra người dùng có vị thế vay nào trước đó hay không
         require(
@@ -106,22 +106,28 @@ contract LendingProtocol {
         for (uint256 i = 0; i < borrowTokens.length; i++) {
             address borrowToken = borrowTokens[i];
             uint256 borrowAmount = borrowAmounts[i];
-            loan.borrowedAmounts[borrowToken] = borrowAmount;
             loan.borrowedTokens.push(borrowToken);
+            loan.borrowedAmounts[borrowToken] = borrowAmount;
         }
 
-        emit LoanInitialized(msg.sender, collateralToken, collateralAmount);
+        emit Borrow(
+            msg.sender,
+            collateralToken,
+            collateralAmount,
+            borrowTokens,
+            borrowAmounts
+        );
     }
 
     function getBorrowCapacity(address user) public view returns (uint256) {
-        Loan storage loan = loans[user];
+        Loan storage loan = _loans[user];
         return
             (loan.collateralAmount * collateralFactors[loan.collateralToken]) /
             exchangeRates[loan.collateralToken];
     }
 
     function getTotalDebt(address user) public view returns (uint256) {
-        Loan storage loan = loans[user];
+        Loan storage loan = _loans[user];
         uint256 totalDebt = 0;
         for (uint256 i = 0; i < loan.borrowedTokens.length; i++) {
             address asset = loan.borrowedTokens[i];
@@ -142,7 +148,7 @@ contract LendingProtocol {
         uint256 liquidatorExchangeRate
     ) public returns (uint256) {
         // Lấy thông tin vị thế vay của Bob
-        Loan storage loan = loans[borrower];
+        Loan storage loan = _loans[borrower];
 
         // Kiểm tra người dùng có vị thế vay không
         require(loan.collateralToken != address(0), "No active loan for user");
@@ -213,7 +219,7 @@ contract LendingProtocol {
 
         // TODO: Khấu trừ khoản repay của liquidator
 
-        emit Liquidation(
+        emit Liquidate(
             borrower,
             repayToken,
             repayAmount,
@@ -225,7 +231,7 @@ contract LendingProtocol {
 
     function setExchangeRate(address tokenType, uint256 rate) external {
         exchangeRates[tokenType] = rate;
-        emit ExchangeRateUpdated(tokenType, rate);
+        emit UpdateExchangeRate(tokenType, rate);
     }
 
     function getExchangeRate(address tokenType) public view returns (uint256) {
@@ -244,7 +250,7 @@ contract LendingProtocol {
             uint256[] memory borrowedAmounts
         )
     {
-        Loan storage loan = loans[borrower];
+        Loan storage loan = _loans[borrower];
 
         // Initialize arrays to store borrowed assets and amounts
         uint256[] memory amounts = new uint256[](loan.borrowedTokens.length);
