@@ -138,8 +138,9 @@ describe("LendingProtocol", function () {
       ethers.formatUnits(currentHealthfactor, DECIMALS)
     );
 
+    console.log("===>");
+
     // Alice liquidates Bob's loan
-    console.log("liquidating...");
     const tx = await lendingProtocol
       .connect(alice)
       .liquidate(bob.address, eth.target, liquidatorExchangeRate);
@@ -151,6 +152,8 @@ describe("LendingProtocol", function () {
     const { seizedAmount, repayAmount } = event.args;
     console.log("seizedAmount (USDC):", ethers.formatUnits(seizedAmount, 18));
     console.log("repayAmount (ETH):", ethers.formatUnits(repayAmount, 18));
+
+    console.log("===>");
 
     // Log Bob's loan state after liquidation
     const finalLoan = await lendingProtocol.getLoan(bob.address);
