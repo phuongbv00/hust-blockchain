@@ -38,7 +38,7 @@ describe("LendingProtocol", function () {
     await axs.mint(alice.address, ethers.parseUnits("500", DECIMALS));
   });
 
-  it("should allow setting collateral factors and exchange rates", async function () {
+  it("Setup collateral factors and exchange rates", async function () {
     await lendingProtocol.setCollateralFactor(
       usdc.target,
       ethers.parseUnits("0.9", DECIMALS)
@@ -80,7 +80,7 @@ describe("LendingProtocol", function () {
     expect(axsExRate).to.equal(ethers.parseUnits("100", DECIMALS));
   });
 
-  it("should allow borrowing against collateral", async function () {
+  it("Setup debt position (+1000 USDC, -0.2 ETH, -20 AXS) then calculate health factor", async function () {
     // Bob deposits 1000 USDC
     await usdc
       .connect(bob)
@@ -111,7 +111,7 @@ describe("LendingProtocol", function () {
     expect(healthFactor).to.gte(ethers.parseUnits("1", DECIMALS));
   });
 
-  it("should allow liquidating unhealthy positions", async function () {
+  it("Change exchange rate (48 AXS/ETH) then liquidate until debt position becomes healthy again", async function () {
     // Modify AXS exchange rate to trigger liquidation
     await lendingProtocol.setExchangeRate(
       axs.target,

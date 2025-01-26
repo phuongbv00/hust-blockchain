@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("UniswapSlippage Proofs", function () {
+describe("UniswapSlippage", function () {
   let uniswapSlippage;
   const initialX = 3000000000; // Large liquidity for token X
   const initialY = 2000000000; // Large liquidity for token Y
