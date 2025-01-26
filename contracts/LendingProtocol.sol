@@ -34,7 +34,7 @@ contract LendingProtocol {
     );
 
     function setCollateralFactor(address token, uint256 factor) external {
-        require(factor > 0 && factor <= 1e18, "Invalid factor");
+        require(factor > 0 && factor <= 1e18, "SET_COLLATERAL_FACTOR_INVALID_FACTOR");
         collateralFactors[token] = factor;
         emit UpdateCollateralFactor(token, factor);
     }
@@ -45,10 +45,10 @@ contract LendingProtocol {
         address[] memory borrowTokens,
         uint256[] memory borrowAmounts
     ) external {
-        require(collateralAmount > 0, "Invalid collateral amount");
+        require(collateralAmount > 0, "BORROW_INVALID_COLLATERAL_AMOUNT");
         require(
             collateralFactors[collateralToken] > 0,
-            "Invalid collateral factor"
+            "BORROW_INVALID_COLLATERAL_FACTOR"
         );
 
         Loan storage loan = _loans[msg.sender];
@@ -56,7 +56,7 @@ contract LendingProtocol {
         // Kiểm tra người dùng có vị thế vay nào trước đó hay không
         require(
             loan.collateralToken == address(0) && loan.collateralAmount == 0,
-            "Existing loan position must be closed first"
+            "BORROW_LOAN_ALREADY_EXISTS"
         );
 
         // Tính khả năng vay
@@ -69,16 +69,16 @@ contract LendingProtocol {
         for (uint256 i = 0; i < borrowTokens.length; i++) {
             address borrowToken = borrowTokens[i];
             uint256 borrowAmount = borrowAmounts[i];
-            require(borrowAmount > 0, "Invalid borrow amount");
+            require(borrowAmount > 0, "BORROW_INVALID_BORROW_AMOUNT");
 
             uint256 exchangeRate = exchangeRates[borrowToken];
-            require(exchangeRate > 0, "Asset exchange rate was not set");
+            require(exchangeRate > 0, "BORROW_INVALID_EXCHANGE_RATE");
 
             totalBorrowValue += (borrowAmount * 1e18) / exchangeRate;
         }
 
         // Kiểm tra tính hợp lệ của khoản vay
-        require(totalBorrowValue <= borrowCapacity, "Exceeds borrowing limit");
+        require(totalBorrowValue <= borrowCapacity, "BORROW_LOW_CAPACITY");
 
         // Cập nhật thông tin khoản vay
         loan.collateralToken = collateralToken;
@@ -132,10 +132,10 @@ contract LendingProtocol {
         Loan storage loan = _loans[borrower];
 
         // Kiểm tra người dùng có vị thế vay không
-        require(loan.collateralToken != address(0), "No active loan for user");
+        require(loan.collateralToken != address(0), "LIQUIDATE_LOAN_DOES_NOT_EXIST");
         require(
             loan.borrowedAmounts[repayToken] > 0,
-            "No debt to liquidate for this asset"
+            "LIQUIDATE_INVALID_BORROWED_AMOUNT"
         );
 
         // Kiểm tra sức khoẻ vị thế vay
@@ -181,13 +181,13 @@ contract LendingProtocol {
 
         require(
             repayAmount <= loan.borrowedAmounts[repayToken],
-            "LIQUIDATE_REPAY_MORE_THAN_BORROW"
+            "LIQUIDATE_REPAY_AMOUNT_MORE_THAN_BORROW_AMOUNT"
         );
 
         // Kiểm tra xem Bob có đủ tài sản thế chấp để thanh lý không
         require(
             seizedAmount <= loan.collateralAmount,
-            "LIQUIDATE_SEIZE_MORE_THAN_COLLATERAL"
+            "LIQUIDATE_SEIZE_AMOUNT_MORE_THAN_COLLATERAL_AMOUNT"
         );
 
         // Khấu trừ tài sản thế chấp của Bob
@@ -233,10 +233,8 @@ contract LendingProtocol {
     {
         Loan storage loan = _loans[borrower];
 
-        // Initialize arrays to store borrowed assets and amounts
         uint256[] memory amounts = new uint256[](loan.borrowedTokens.length);
 
-        // Loop through the borrowedAssetList and retrieve amounts from the borrowedAssets mapping
         for (uint i = 0; i < loan.borrowedTokens.length; i++) {
             amounts[i] = loan.borrowedAmounts[loan.borrowedTokens[i]];
         }
