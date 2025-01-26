@@ -34,7 +34,10 @@ contract LendingProtocol {
     );
 
     function setCollateralFactor(address token, uint256 factor) external {
-        require(factor > 0 && factor <= 1e18, "SET_COLLATERAL_FACTOR_INVALID_FACTOR");
+        require(
+            factor > 0 && factor <= 1e18,
+            "SET_COLLATERAL_FACTOR_INVALID_FACTOR"
+        );
         collateralFactors[token] = factor;
         emit UpdateCollateralFactor(token, factor);
     }
@@ -132,7 +135,10 @@ contract LendingProtocol {
         Loan storage loan = _loans[borrower];
 
         // Kiểm tra người dùng có vị thế vay không
-        require(loan.collateralToken != address(0), "LIQUIDATE_LOAN_DOES_NOT_EXIST");
+        require(
+            loan.collateralToken != address(0),
+            "LIQUIDATE_LOAN_DOES_NOT_EXIST"
+        );
         require(
             loan.borrowedAmounts[repayToken] > 0,
             "LIQUIDATE_INVALID_BORROWED_AMOUNT"
@@ -163,12 +169,9 @@ contract LendingProtocol {
 
         uint256 repayAmount = 0;
         uint256 seizedAmount = 0;
-        uint256 step = 0;
+        uint256 step = 1e18;    // TODO: optimize step
         while (healthFactor < 1) {
-            step++;
-            // repayAmount++;
-            // seizedAmount = liquidatorExchangeRate * repayAmount;
-            seizedAmount += 1e18 * step;
+            seizedAmount += step;
             repayAmount = (seizedAmount * 1e18) / liquidatorExchangeRate;
             healthFactor =
                 ((borrowCapacity *
