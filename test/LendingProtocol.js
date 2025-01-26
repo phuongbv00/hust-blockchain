@@ -126,35 +126,46 @@ describe("LendingProtocol", function () {
       bob.address
     );
     console.log(
-      "initialCollaterals",
+      "initialCollaterals (USDC):",
       ethers.formatUnits(initialLoan.collateralAmount, DECIMALS)
     );
-    console.log("initialBorrowedETH", ethers.formatUnits(borrwedETH, DECIMALS));
     console.log(
-      "currentHealthfactor",
+      "initialBorrowed (ETH):",
+      ethers.formatUnits(borrwedETH, DECIMALS)
+    );
+    console.log(
+      "currentHealthfactor:",
       ethers.formatUnits(currentHealthfactor, DECIMALS)
     );
 
     // Alice liquidates Bob's loan
     console.log("liquidating...");
-    await lendingProtocol
+    const tx = await lendingProtocol
       .connect(alice)
       .liquidate(bob.address, eth.target, liquidatorExchangeRate);
+    const receipt = await tx.wait();
+    const event = receipt.logs
+      .map((log) => lendingProtocol.interface.parseLog(log))
+      .find((parsedLog) => parsedLog.name === "Liquidate");
+    expect(event).to.be.not.null;
+    const { seizedAmount, repayAmount } = event.args;
+    console.log("seizedAmount (USDC):", ethers.formatUnits(seizedAmount, 18));
+    console.log("repayAmount (ETH):", ethers.formatUnits(repayAmount, 18));
 
     // Log Bob's loan state after liquidation
     const finalLoan = await lendingProtocol.getLoan(bob.address);
     const remainBorrowedETH = finalLoan.borrowedAmounts[0];
     const newHealthfactor = await lendingProtocol.getHealthFactor(bob.address);
     console.log(
-      "remainCollaterals",
+      "remainCollaterals (USDC):",
       ethers.formatUnits(finalLoan.collateralAmount, DECIMALS)
     );
     console.log(
-      "remainBorrowedETH",
+      "remainBorrowed (ETH):",
       ethers.formatUnits(remainBorrowedETH, DECIMALS)
     );
     console.log(
-      "newHealthfactor",
+      "newHealthfactor:",
       ethers.formatUnits(newHealthfactor, DECIMALS)
     );
     expect(newHealthfactor).to.be.gte(1);

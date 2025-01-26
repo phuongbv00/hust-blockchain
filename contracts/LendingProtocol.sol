@@ -1,25 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IPriceOracle {
-    function getPrice(address asset) external view returns (uint256);
-
-    function setPrice(address asset, uint256 price) external;
-}
-
-interface IERC20 {
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-
-    function transfer(
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-}
-
 contract LendingProtocol {
     struct Loan {
         address collateralToken;
@@ -217,7 +198,7 @@ contract LendingProtocol {
 
         // TODO: Chuyển phần tài sản tịch thu cho liquidator
 
-        // TODO: Khấu trừ khoản repay của liquidator
+        // TODO: Khấu trừ khoản repay từ ví của liquidator
 
         emit Liquidate(
             borrower,
