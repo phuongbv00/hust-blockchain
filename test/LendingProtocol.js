@@ -27,15 +27,6 @@ describe("LendingProtocol", function () {
     const LendingProtocol = await ethers.getContractFactory("LendingProtocol");
     lendingProtocol = await LendingProtocol.deploy();
     await lendingProtocol.waitForDeployment();
-
-    // Mint tokens for users
-    await usdc.mint(owner.address, ethers.parseUnits("10000", DECIMALS));
-    await eth.mint(owner.address, ethers.parseUnits("100", DECIMALS));
-    await axs.mint(owner.address, ethers.parseUnits("1000", DECIMALS));
-
-    await usdc.mint(alice.address, ethers.parseUnits("5000", DECIMALS));
-    await eth.mint(alice.address, ethers.parseUnits("50", DECIMALS));
-    await axs.mint(alice.address, ethers.parseUnits("500", DECIMALS));
   });
 
   it("Setup collateral factors and exchange rates", async function () {
