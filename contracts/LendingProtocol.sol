@@ -168,7 +168,7 @@ contract LendingProtocol {
         uint256 exchangeRateX = exchangeRates[loan.collateralToken];
         uint256 exchangeRateY = exchangeRates[repayToken];
 
-        uint256 seizedAmount = ((debtValue - borrowCapacity) * liquidatorExchangeRate / (1e18 - collateralFactorX * liquidatorExchangeRate / exchangeRateX) / 1e18 + 1) * 1e18;
+        uint256 seizedAmount = ((totalDebt - borrowCapacity) * liquidatorExchangeRate / (1e18 - collateralFactorX * liquidatorExchangeRate / exchangeRateX) / 1e18 + 1) * 1e18;
         uint256 repayAmount = seizedAmount * 1e18 / liquidatorExchangeRate;
         // liquidatorExchangeRate * (debtValue - borrowCapacity * 1e18) / (1e18 - collateralFactorX * liquidatorExchangeRate / exchangeRateX) / (1e18);
         // uint256 step = 1e18;    // TODO: optimize step
