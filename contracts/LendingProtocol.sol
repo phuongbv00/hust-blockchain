@@ -167,20 +167,21 @@ contract LendingProtocol {
         uint256 exchangeRateX = exchangeRates[loan.collateralToken];
         uint256 exchangeRateY = exchangeRates[repayToken];
 
-        uint256 repayAmount = 0;
-        uint256 seizedAmount = 0;
-        uint256 step = 1e18;    // TODO: optimize step
-        while (healthFactor < 1) {
-            seizedAmount += step;
-            repayAmount = (seizedAmount * 1e18) / liquidatorExchangeRate;
-            healthFactor =
-                ((borrowCapacity *
-                    exchangeRateX -
-                    seizedAmount *
-                    collateralFactorX) * exchangeRateY) /
-                exchangeRateX /
-                (debtValue * exchangeRateY - repayAmount * 1e18);
-        }
+        uint256 seizedAmount = ((debtValue - borrowCapacity) * liquidatorExchangeRate / (1e18 - collateralFactorX * liquidatorExchangeRate / exchangeRateX) / 1e18 + 1) * 1e18;
+        uint256 repayAmount = seizedAmount * 1e18 / liquidatorExchangeRate;
+        // liquidatorExchangeRate * (debtValue - borrowCapacity * 1e18) / (1e18 - collateralFactorX * liquidatorExchangeRate / exchangeRateX) / (1e18);
+        // uint256 step = 1e18;    // TODO: optimize step
+        // while (healthFactor < 1) {
+        //     seizedAmount += step;
+        //     repayAmount = (seizedAmount * 1e18) / liquidatorExchangeRate;
+        //     healthFactor =
+        //         ((borrowCapacity *
+        //             exchangeRateX -
+        //             seizedAmount *
+        //             collateralFactorX) * exchangeRateY) /
+        //         exchangeRateX /
+        //         (debtValue * exchangeRateY - repayAmount * 1e18);
+        // }
 
         require(
             repayAmount <= loan.borrowedAmounts[repayToken],
