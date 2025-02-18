@@ -143,7 +143,7 @@ describe("LendingProtocol", function () {
     const event = receipt.logs
       .map((log) => lendingProtocol.interface.parseLog(log))
       .find((parsedLog) => parsedLog.name === "Liquidate");
-    expect(event).to.be.not.null;
+    expect(event).to.be.not.undefined;
     const { seizedAmount, repayAmount } = event.args;
     console.log("seizedAmount (USDC):", ethers.formatUnits(seizedAmount, 18));
     console.log("repayAmount (ETH):", ethers.formatUnits(repayAmount, 18));

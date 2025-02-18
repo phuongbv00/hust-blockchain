@@ -146,9 +146,9 @@ contract LendingProtocol {
 
         // Kiểm tra sức khoẻ vị thế vay
         uint256 borrowCapacity = getBorrowCapacity(borrower);
-        uint256 debtValue = getTotalDebt(borrower);
-        uint256 healthFactor = borrowCapacity / debtValue;
-        if (borrowCapacity >= debtValue) {
+        uint256 totalDebt = getTotalDebt(borrower);
+        uint256 healthFactor = borrowCapacity / totalDebt;
+        if (borrowCapacity >= totalDebt) {
             return 0;
         }
 
@@ -160,8 +160,9 @@ contract LendingProtocol {
         // Calculate to satisfy:
         //
         // newBorrowCapacity = (collateralAmount - x) * collateralFactorX / exchangeRateX
-        // newDebtValue = debtValue - y / exchangeRateY
-        // newBorrowCapacity >= newDebtValue
+        // newTotalDebt = totalDebt - y / exchangeRateY
+        // healthFactor = newBorrowCapacity / newTotalDebt
+        // healthFactor >= 1
         // x / y == liquidatorExchangeRate
         uint256 collateralFactorX = collateralFactors[loan.collateralToken];
         uint256 exchangeRateX = exchangeRates[loan.collateralToken];
